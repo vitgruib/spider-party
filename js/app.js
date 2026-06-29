@@ -1,5 +1,5 @@
 // ============================================================
-//  Party Games - web port of the Flutter app by Vitgrub Studios
+//  Spider-Party - web port of the Flutter app by Vitgrub Studios
 //  Games: Charades (Heads Up, tilt support), Imposter, Spin the Wheel
 //  Works on phones (tilt + tap) and laptops (tap + keyboard).
 //  Shared word lists + custom lists live in store.js.
@@ -10,7 +10,7 @@ import {
 } from './store.js';
 import { wavelengthPairs } from './extra-data.js';
 
-const REPO_URL = 'https://github.com/vitgruib/party-web';
+const REPO_URL = 'https://github.com/vitgruib/spider-party';
 const BUG_EMAIL = 'ethanc8858@gmail.com';
 const APP_VERSION = '0.2';
 
@@ -233,7 +233,7 @@ function mainMenu() {
     <div class="screen">
       <div class="wrap">
         <div class="title-block">
-          <div class="title-grad">Party Games</div>
+          <div class="title-grad">Spider-Party</div>
           <div class="title-sub">Choose your game</div>
         </div>
         <div id="game-list">
@@ -273,7 +273,7 @@ function mainMenu() {
 //  BUG REPORTS
 // ============================================================
 function bugReportModal(context = 'Main menu') {
-  const diag = `\n\n---\nApp: Party Games v${APP_VERSION}\nScreen: ${context}\nDevice: ${navigator.userAgent}\nViewport: ${window.innerWidth}x${window.innerHeight}\nDate: ${new Date().toISOString()}`;
+  const diag = `\n\n---\nApp: Spider-Party v${APP_VERSION}\nScreen: ${context}\nDevice: ${navigator.userAgent}\nViewport: ${window.innerWidth}x${window.innerHeight}\nDate: ${new Date().toISOString()}`;
   const backdrop = openModal(`
     <div class="dialog">
       <h3>Bug report or suggestion</h3>
@@ -288,7 +288,7 @@ function bugReportModal(context = 'Main menu') {
 
   const getBody = () => (backdrop.querySelector('#desc').value.trim() || '(no description)') + diag;
   backdrop.querySelector('#email').onclick = () => {
-    location.href = `mailto:${BUG_EMAIL}?subject=${encodeURIComponent('Party Games — bug / suggestion')}&body=${encodeURIComponent(getBody())}`;
+    location.href = `mailto:${BUG_EMAIL}?subject=${encodeURIComponent('Spider-Party — bug / suggestion')}&body=${encodeURIComponent(getBody())}`;
   };
   backdrop.querySelector('#gh').onclick = () => {
     window.open(`${REPO_URL}/issues/new?title=${encodeURIComponent('Bug / suggestion: ')}&body=${encodeURIComponent(getBody())}`, '_blank', 'noopener');

@@ -1,6 +1,6 @@
 # 🗺️ Plans / Roadmap
 
-Tracking what's done and what's next for Party Games (web).
+Tracking what's done and what's next for Spider-Party (web).
 
 ## ✅ Done
 - [x] **Charades / Heads Up** — left/right tap (no tilt) + keyboard controls.
