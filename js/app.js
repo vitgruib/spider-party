@@ -7,8 +7,12 @@
 import {
   getCategories, getCustomLists, saveCustomList, deleteCustomList,
   getRetire, setRetire, availableWords, markUsed, refreshUsed,
-  voteList, decodeList, importList, shareUrl, encodeList,
 } from './store.js';
+import { wavelengthPairs } from './extra-data.js';
+
+const REPO_URL = 'https://github.com/vitgruib/party-web';
+const BUG_EMAIL = 'ethanc8858@gmail.com';
+const APP_VERSION = '0.2';
 
 // ---------- Game settings (mirrors theme.dart GameSettings) ----------
 const SETTINGS = {
@@ -18,8 +22,6 @@ const SETTINGS = {
   timeOptions: [30, 45, 60, 90, 120],
   pointsPerCorrect: 1,
   pointsPerSkip: 0,
-  triggerAngle: 60,
-  neutralAngle: 30,
 };
 
 const FEEDBACK_FORM = 'https://forms.gle/yC7SvG9SeS1nLwmS6';
@@ -80,13 +82,13 @@ function icon(name, size = 20) {
 // Category name -> Material Symbol. Unknown names (custom lists) fall back to a list glyph.
 const CAT_ICONS = {
   'Movies & TV': 'movie', 'Video Games': 'sports_esports', 'Music (Artist — Song)': 'music_note',
-  'Animals': 'pets', 'Food & Drinks': 'restaurant', 'Brands': 'sell', 'Objects': 'category',
+  'Animals': 'pets', 'Food & Drinks': 'restaurant', 'Food': 'restaurant', 'Brands': 'sell', 'Objects': 'category',
   'Actions': 'directions_run', 'Anime': 'animation', 'Jobs & Professions': 'work',
   'School Subjects': 'school', 'Instruments': 'piano', 'Landmarks': 'account_balance',
   'Everything': 'all_inclusive', 'Sports': 'sports_basketball', 'Countries': 'public',
   'Superheroes': 'bolt', 'Disney': 'castle', 'Emotions': 'mood', 'Fruits & Veggies': 'nutrition',
   'Space': 'rocket_launch', 'Mythical Creatures': 'auto_awesome', 'Vehicles': 'directions_car',
-  'Holidays': 'celebration',
+  'Holidays': 'celebration', 'Colleges': 'school', 'Japanese Foods': 'ramen_dining',
 };
 function catSymbol(name) { return CAT_ICONS[name] || 'label'; }
 
@@ -222,6 +224,7 @@ const GAMES = [
   { title: 'Charades', subtitle: 'Guess the word on your forehead', color: '#c0392b', symbol: 'theater_comedy', open: headsUpCategoryScreen },
   { title: 'Imposter', subtitle: 'Find the fake among you', color: '#7d3c98', symbol: 'person_search', open: imposterSetupScreen },
   { title: 'Spin the Wheel', subtitle: 'Spin and land on a random word', color: '#2471a3', symbol: 'casino', open: spinWheelSetupScreen },
+  { title: 'Wavelength', subtitle: 'Read minds on a hidden spectrum', color: '#1e8449', symbol: 'tune', open: wavelengthSetupScreen },
 ];
 
 function mainMenu() {
@@ -246,20 +249,52 @@ function mainMenu() {
           <div class="game-card pressable" id="lists-card">
             ${badge('format_list_bulleted', '#5d6d7e')}
             <div class="grow">
-              <div class="ttl">Custom Lists &amp; Community</div>
-              <div class="sub">Make your own word lists &amp; vote on shared ones</div>
+              <div class="ttl">Custom Lists</div>
+              <div class="sub">Make your own word lists</div>
             </div>
             <div class="arrow">&rsaquo;</div>
           </div>
         </div>
         <div class="spacer"></div>
-        <div class="credits-link" id="credits">Credits &amp; Feedback</div>
+        <div class="row" style="justify-content:center;gap:18px">
+          <div class="credits-link" id="credits">Credits &amp; Feedback</div>
+          <div class="credits-link" id="bug">Bug / suggestion</div>
+        </div>
       </div>
     </div>`);
   on(node, '.game-card[data-i]', 'click', (e) => GAMES[+e.currentTarget.dataset.i].open());
   on(node, '#lists-card', 'click', listsScreen);
   on(node, '#credits', 'click', creditsScreen);
+  on(node, '#bug', 'click', () => bugReportModal());
   mount(node);
+}
+
+// ============================================================
+//  BUG REPORTS
+// ============================================================
+function bugReportModal(context = 'Main menu') {
+  const diag = `\n\n---\nApp: Party Games v${APP_VERSION}\nScreen: ${context}\nDevice: ${navigator.userAgent}\nViewport: ${window.innerWidth}x${window.innerHeight}\nDate: ${new Date().toISOString()}`;
+  const backdrop = openModal(`
+    <div class="dialog">
+      <h3>Bug report or suggestion</h3>
+      <div class="muted mb12" style="font-size:13px">Report a bug (what happened, steps, what you expected) or suggest a feature / word list.</div>
+      <textarea class="input" id="desc" rows="5" placeholder="Describe the bug or suggestion…"></textarea>
+      <div class="muted2 mt8 mb12" style="font-size:11px">Device & version details are attached automatically.</div>
+      <button class="btn btn-primary mb8" id="email">Send by email</button>
+      <button class="btn btn-ghost mb8" id="gh">Open a GitHub issue</button>
+      <button class="btn btn-ghost mb8" id="copy">Copy report</button>
+      <button class="btn btn-faint" id="cancel">Cancel</button>
+    </div>`, { center: true });
+
+  const getBody = () => (backdrop.querySelector('#desc').value.trim() || '(no description)') + diag;
+  backdrop.querySelector('#email').onclick = () => {
+    location.href = `mailto:${BUG_EMAIL}?subject=${encodeURIComponent('Party Games — bug / suggestion')}&body=${encodeURIComponent(getBody())}`;
+  };
+  backdrop.querySelector('#gh').onclick = () => {
+    window.open(`${REPO_URL}/issues/new?title=${encodeURIComponent('Bug / suggestion: ')}&body=${encodeURIComponent(getBody())}`, '_blank', 'noopener');
+  };
+  backdrop.querySelector('#copy').onclick = async () => toast((await copyText(getBody())) ? 'Report copied' : 'Copy failed');
+  backdrop.querySelector('#cancel').onclick = () => closeModal(backdrop);
 }
 
 // ============================================================
@@ -280,14 +315,16 @@ function creditsScreen() {
             I'll try my best to implement ASAP. Thanks to all my closed testers.
           </div>
           <div class="tcenter muted mt24 mb12">Have feedback or suggestions?</div>
-          <a class="btn btn-ghost" style="text-decoration:none"
+          <a class="btn btn-ghost mb8" style="text-decoration:none"
              href="${FEEDBACK_FORM}" target="_blank" rel="noopener">Anonymous Feedback Form</a>
+          <button class="btn btn-ghost" id="bug">Report a bug or suggestion</button>
         </div>
         <button class="btn btn-primary mt16" id="cont">Continue to games</button>
       </div>
     </div>`);
   on(node, '#back', 'click', mainMenu);
   on(node, '#cont', 'click', mainMenu);
+  on(node, '#bug', 'click', () => bugReportModal('Credits'));
   mount(node);
 }
 
@@ -312,9 +349,9 @@ function headsUpCategoryScreen() {
         <div class="scroll" style="flex:1">
           <div class="panel mb16">
             <div class="inst-bar">
-              <div class="inst"><div class="l">Tilt up / tap top</div><div class="sm">Correct</div></div>
+              <div class="inst"><div class="l">Tap left</div><div class="sm">Pass</div></div>
               <div class="divider-v"></div>
-              <div class="inst"><div class="l">Tilt down / tap bottom</div><div class="sm">Skip</div></div>
+              <div class="inst"><div class="l">Tap right</div><div class="sm">Correct</div></div>
             </div>
           </div>
 
@@ -368,8 +405,8 @@ function headsUpRulesModal() {
       ${[
         'Hold the phone to your forehead with the screen facing outward',
         'Your friends give you clues about the word on screen',
-        'Tilt the phone down (or tap the bottom / press the down arrow) to skip',
-        'Tilt the phone up (or tap the top / press the up arrow or space) when you guess correct',
+        'Tap the RIGHT side of the screen (or press → / space) when you guess correct',
+        'Tap the LEFT side of the screen (or press ←) to pass',
         'Get as many correct answers as possible before time runs out',
       ].map((t) => `<div class="rule-li"><div class="dot"></div><span>${esc(t)}</span></div>`).join('')}
       <div class="rule-h">Variations</div>
@@ -386,44 +423,12 @@ function headsUpCountdown(category, duration) {
       <div class="hu-game" style="background:${grad(category.primary)}">
         <div style="font-size:24px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,.85)">GET READY</div>
         <div class="cd-num mt16" id="num">${SETTINGS.countdownSeconds}</div>
-        <div class="mt16" style="font-size:16px;color:rgba(255,255,255,.75)">Hold phone to forehead</div>
+        <div class="mt16" style="font-size:16px;color:rgba(255,255,255,.75)">Phone to forehead — tap left to pass, right for correct</div>
         <div class="mt16" style="background:rgba(0,0,0,.3);border-radius:var(--radius);padding:6px 14px;font-weight:700">${duration} seconds</div>
       </div>
     </div>`);
   mount(node);
-  showTiltInstructions(category, () => runCountdown(node, category, duration));
-}
-
-function showTiltInstructions(category, onStart) {
-  const supportsMotion = typeof DeviceMotionEvent !== 'undefined';
-  const backdrop = openModal(`
-    <div class="dialog">
-      <h3>How controls work</h3>
-      <div class="mb12" style="font-weight:600">On a phone — tilt detection:</div>
-      ${[
-        'Tilt the phone fully up or down',
-        'Hold the tilt for a moment',
-        'Wait for the vibration / colour flash',
-        'Return to level before the next tilt',
-      ].map((t) => `<div class="rule-li"><div class="dot"></div><span>${esc(t)}</span></div>`).join('')}
-      <div class="panel mt12" style="font-size:13px;color:var(--muted)">
-        No tilt sensor (laptop)? Tap the top half or press the up arrow / space for correct;
-        tap the bottom or press the down arrow for pass.
-      </div>
-      <div id="motion-wrap" class="${supportsMotion ? '' : 'hidden'} mt12">
-        <button class="btn btn-ghost" id="enable-motion">Enable tilt controls</button>
-        <div class="muted2 tcenter mt8" id="motion-status" style="font-size:12px"></div>
-      </div>
-      <button class="btn btn-primary mt16" id="gotit">Got it</button>
-    </div>`, { center: true });
-
-  const status = backdrop.querySelector('#motion-status');
-  backdrop.querySelector('#enable-motion').onclick = async () => {
-    const ok = await enableMotion();
-    motionEnabled = ok;
-    status.textContent = ok ? 'Tilt enabled' : 'Not available — use taps / keys instead';
-  };
-  backdrop.querySelector('#gotit').onclick = () => { closeModal(backdrop); onStart(); };
+  runCountdown(node, category, duration);
 }
 
 function runCountdown(node, category, duration) {
@@ -438,19 +443,6 @@ function runCountdown(node, category, duration) {
   tick();
 }
 
-// ---------- Motion control ----------
-let motionEnabled = false;
-async function enableMotion() {
-  try {
-    if (typeof DeviceMotionEvent === 'undefined') return false;
-    if (typeof DeviceMotionEvent.requestPermission === 'function') {
-      const res = await DeviceMotionEvent.requestPermission();
-      return res === 'granted';
-    }
-    return true;
-  } catch { return false; }
-}
-
 // ---------- Heads Up gameplay ----------
 function headsUpGame(category, duration) {
   requestWakeLock();
@@ -461,10 +453,7 @@ function headsUpGame(category, duration) {
   let timeLeft = duration;
   let canAct = true;
   let paused = false;
-  let lastPitch = 0;
-  let returnedToNeutral = true;
   let timerId = null;
-  let motionHandler = null;
 
   const node = el(`
     <div class="screen">
@@ -474,14 +463,11 @@ function headsUpGame(category, duration) {
         <div class="hu-pill hu-score"><span id="score">0</span></div>
         <div class="hu-pill hu-timer"><span id="time">${timeLeft}</span>s</div>
 
-        <div class="hu-tap top" id="tap-correct"></div>
-        <div class="hu-tap bottom" id="tap-skip"></div>
-
         <div id="word" class="hu-word">${esc(words[0] || '—')}</div>
 
         <div class="hu-hints" id="hints">
-          <div class="hu-hint"><div class="a">Tilt up · tap top · &uarr;</div><div class="l" style="color:var(--correct-accent)">Correct</div></div>
-          <div class="hu-hint"><div class="a">Tilt down · tap bottom · &darr;</div><div class="l" style="color:var(--skip-accent)">Pass</div></div>
+          <div class="hu-hint"><div class="a">&larr; Tap left</div><div class="l" style="color:var(--skip-accent)">Pass</div></div>
+          <div class="hu-hint"><div class="a">Tap right &rarr;</div><div class="l" style="color:var(--correct-accent)">Correct</div></div>
         </div>
       </div>
     </div>`);
@@ -516,7 +502,6 @@ function headsUpGame(category, duration) {
       idx++;
       shown.push(words[idx]);
       canAct = true;
-      returnedToNeutral = true;
       wordEl.className = 'hu-word';
       wordEl.textContent = words[idx];
     } else { endGame(); }
@@ -533,7 +518,6 @@ function headsUpGame(category, duration) {
 
   function cleanup() {
     document.removeEventListener('keydown', keyHandler);
-    if (motionHandler) window.removeEventListener('devicemotion', motionHandler);
     releaseWakeLock();
   }
 
@@ -546,31 +530,18 @@ function headsUpGame(category, duration) {
     if (timeLeft <= 0) endGame();
   }, 1000);
 
-  node.querySelector('#tap-correct').addEventListener('click', () => act(true));
-  node.querySelector('#tap-skip').addEventListener('click', () => act(false));
+  // Tap the right half = correct, left half = pass. Clicks on the exit
+  // button / pills are ignored so those controls keep working.
+  stage.addEventListener('click', (e) => {
+    if (e.target.closest('#exit, .hu-pill')) return;
+    act(e.clientX >= window.innerWidth / 2);
+  });
   const keyHandler = (e) => {
-    if (e.key === 'ArrowUp' || e.key === ' ' || e.code === 'Space') { e.preventDefault(); act(true); }
-    else if (e.key === 'ArrowDown') { e.preventDefault(); act(false); }
+    if (e.key === 'ArrowRight' || e.key === ' ' || e.code === 'Space') { e.preventDefault(); act(true); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); act(false); }
     else if (e.key === 'Escape') showExit();
   };
   document.addEventListener('keydown', keyHandler);
-
-  if (motionEnabled) {
-    motionHandler = (event) => {
-      const g = event.accelerationIncludingGravity;
-      if (!g || g.x == null || !canAct || paused) return;
-      const { x, y, z } = g;
-      const pitch = Math.atan2(z, Math.sqrt(x * x + y * y)) * 180 / Math.PI;
-      const inNeutral = Math.abs(pitch) < SETTINGS.neutralAngle;
-      if (inNeutral && !returnedToNeutral) returnedToNeutral = true;
-      if (returnedToNeutral) {
-        if (pitch > SETTINGS.triggerAngle && lastPitch <= SETTINGS.triggerAngle) { returnedToNeutral = false; act(true); }
-        else if (pitch < -SETTINGS.triggerAngle && lastPitch >= -SETTINGS.triggerAngle) { returnedToNeutral = false; act(false); }
-      }
-      lastPitch = pitch;
-    };
-    window.addEventListener('devicemotion', motionHandler);
-  }
 
   function showExit() {
     paused = true;
@@ -669,18 +640,17 @@ function imposterSetupScreen() {
       <div class="wrap">
         <div class="app-header">
           <button class="icon-btn" id="back">${icon('back')}</button>
-          <div class="grow"><h1>Imposter</h1><p>Find the fake</p></div>
-          <button class="icon-btn" id="info">${icon('info')}</button>
+          <div class="grow"><h1>Imposter</h1><p>One device, passed around</p></div>
         </div>
         <div class="scroll" style="flex:1">
           <div class="panel mb16">
             <div class="panel-title">HOW TO PLAY</div>
             ${[
-              'Each player views their screen privately',
-              'One random player is the imposter',
-              'The imposter sees "???" instead of the word',
-              'Discuss and vote on who the imposter is',
-              'The imposter wins if they can guess the word',
+              'One random player is secretly the imposter. Everyone else (the citizens) gets the same secret word — the imposter only sees ???.',
+              'Single device: starting with Player 1, pass the phone around in turn order so each player privately sees their role, then hides it and passes it on.',
+              'Now give clues. Starting from the first player and going in order, each player says ONE vague word out loud that hints at the secret word.',
+              'After each full round of clues — from the second round onward — anyone can call a vote: the group decides whether to keep giving clues or stop and accuse.',
+              'When you stop, everyone votes for who they think the imposter is. The imposter wins by surviving the vote, or by correctly guessing the secret word.',
             ].map((t, i) => `<div class="rule-li"><div class="checkbox" style="background:var(--surface-2)">${i + 1}</div><span>${esc(t)}</span></div>`).join('')}
           </div>
 
@@ -709,7 +679,6 @@ function imposterSetupScreen() {
     </div>`);
 
   on(node, '#back', 'click', mainMenu);
-  on(node, '#info', 'click', imposterRulesModal);
   wireRetire(node);
   on(node, '#pminus', 'click', () => { if (impPlayers > 3) { impPlayers--; node.querySelector('#pcount').textContent = impPlayers; } });
   on(node, '#pplus', 'click', () => { if (impPlayers < 12) { impPlayers++; node.querySelector('#pcount').textContent = impPlayers; } });
@@ -728,36 +697,6 @@ function imposterSetupScreen() {
   mount(node);
 }
 
-function imposterRulesModal() {
-  const sections = [
-    ['Basic Rules', [
-      'One player is randomly chosen as the imposter',
-      'All other players (citizens) see the secret word',
-      'The imposter sees "???" instead of the word',
-      'During discussion, everyone talks about the word vaguely',
-      'The imposter must pretend they know the word',
-      'After discussion, vote on who you think is the imposter',
-    ]],
-    ['Tips for Citizens', [
-      "Be vague — don't give away the exact word",
-      'Ask questions that only someone who knows the word could answer',
-      'Watch for people who give very generic answers',
-    ]],
-    ['Tips for the Imposter', [
-      "Listen carefully to others' clues to figure out the word",
-      'Give vague answers that could apply to many words',
-      'Blend in by nodding and agreeing with others',
-    ]],
-  ];
-  const backdrop = openModal(`
-    <div class="sheet">
-      <div class="sheet-handle"></div>
-      <div class="row mb8"><h2 style="margin:0;font-size:18px">How to Play</h2><div class="spacer"></div><button class="icon-btn" id="x">${icon('close')}</button></div>
-      ${sections.map(([h, items]) => `<div class="rule-h">${h}</div>${items.map((t) => `<div class="rule-li"><div class="dot"></div><span>${esc(t)}</span></div>`).join('')}`).join('')}
-    </div>`);
-  backdrop.querySelector('#x').onclick = () => closeModal(backdrop);
-}
-
 function imposterGame(category) {
   const playerCount = impPlayers;
   const imposterIndex = impAllowFirst ? randInt(playerCount) : 1 + randInt(playerCount - 1);
@@ -772,9 +711,11 @@ function imposterGame(category) {
     const dots = () => `<div class="dots">${Array.from({ length: playerCount }, (_, i) =>
       `<div class="dot-pip ${i < current ? 'done' : i === current ? 'cur' : ''}"></div>`).join('')}</div>`;
 
-    let bg, body;
+    // Same background for every player/role so you can't read someone's role
+    // from the screen glow / their reaction.
+    const bg = '#1c1f24';
+    let body;
     if (!revealed) {
-      bg = '#1c1f24';
       body = `
         <div class="spacer"></div>
         <div class="tcenter">
@@ -790,7 +731,6 @@ function imposterGame(category) {
         <div class="spacer"></div>
         ${dots()}`;
     } else {
-      bg = isImposter() ? '#3a2230' : grad(category.primary);
       const badge = isImposter()
         ? '<div class="role-badge" style="background:rgba(255,255,255,.18);color:#fff">IMPOSTER</div>'
         : '<div class="role-badge" style="background:rgba(255,255,255,.18);color:#fff">CITIZEN</div>';
@@ -965,7 +905,8 @@ function spinWheelGame(category) {
     wheelEl.style.background = n === 1 ? colors[0] : `conic-gradient(${stops})`;
     wheelEl.innerHTML = segments.map((w, i) => {
       const mid = i * seg + seg / 2;
-      return `<div class="wheel-label" style="transform:rotate(${mid}deg)"><span class="txt" style="transform:translate(-50%,-50%) rotate(${-mid}deg)">${esc(w)}</span></div>`;
+      const flip = mid > 180; // keep text upright on the left half of the wheel
+      return `<div class="wheel-label" style="transform:rotate(${mid - 90}deg)"><span class="txt" style="transform:translate(-50%,-50%)${flip ? ' rotate(180deg)' : ''}">${esc(w)}</span></div>`;
     }).join('');
     updateRemain();
     return true;
@@ -1015,43 +956,213 @@ function spinWheelGame(category) {
 }
 
 // ============================================================
-//  CUSTOM LISTS & COMMUNITY
+//  WAVELENGTH
 // ============================================================
-function listsScreen() {
-  const lists = getCustomLists().slice().sort((a, b) => (b.votes || 0) - (a.votes || 0));
+const WL_ACCENT = '#1e8449';
+let wlTeams = 1;          // 1 = single shared score; 2-4 = alternating teams
+let wlScores = [0];       // per-team totals
+let wlRoundNo = 0;        // rounds completed; active team = wlRoundNo % wlTeams
+
+function wlSetTeams(n) {
+  wlTeams = Math.max(1, Math.min(4, n));
+  wlScores = Array(wlTeams).fill(0);
+  wlRoundNo = 0;
+}
+
+function wavelengthSetupScreen() {
+  const max = Math.max(...wlScores);
+  const scoreboard = !wlRoundNo ? '' : wlTeams === 1
+    ? `<div class="panel tcenter mb16">Score: <b>${wlScores[0]}</b> over ${wlRoundNo} round${wlRoundNo === 1 ? '' : 's'} <button class="link-btn" id="reset">reset</button></div>`
+    : `<div class="panel mb16">
+         <div class="panel-title">SCORES</div>
+         ${wlScores.map((s, i) => `<div class="row" style="justify-content:space-between;padding:3px 0"><span${s === max && s > 0 ? ' style="font-weight:700;color:var(--correct-accent)"' : ''}>Team ${i + 1}</span><b>${s}</b></div>`).join('')}
+         <div class="tcenter"><button class="link-btn mt8" id="reset">reset scores</button></div>
+       </div>`;
+
   const node = el(`
     <div class="screen">
       <div class="wrap">
         <div class="app-header">
           <button class="icon-btn" id="back">${icon('back')}</button>
-          <div class="grow"><h1>Custom Lists</h1><p>Make your own &amp; vote on shared lists</p></div>
+          <div class="grow"><h1>Wavelength</h1><p>One device, passed around</p></div>
         </div>
-        <div class="row gap8 mb16">
-          <button class="btn btn-primary" id="create">${icon('plus', 16)} New list</button>
-          <button class="btn btn-ghost" id="import">${icon('share', 16)} Import</button>
+        <div class="scroll" style="flex:1">
+          <div class="panel mb16">
+            <div class="panel-title">HOW TO PLAY</div>
+            ${[
+              'There is a spectrum between two opposites (e.g. Cold ↔ Hot) with a hidden target zone somewhere on it.',
+              'Pick one player to be the Psychic. Only they tap to reveal the target, then hide it again.',
+              'The Psychic gives a single clue that points to where the target sits between the two ends.',
+              'Everyone else slides the dial to where they think the target is, then locks in the guess.',
+              'Reveal scores 4 / 3 / 2 points by how close you land. With teams on, turns alternate each round.',
+            ].map((t, i) => `<div class="rule-li"><div class="checkbox" style="background:var(--surface-2)">${i + 1}</div><span>${esc(t)}</span></div>`).join('')}
+          </div>
+
+          <div class="panel-title">TEAMS</div>
+          <div class="stepper mb8">
+            <button class="step-btn" id="tminus">&minus;</button>
+            <div class="step-box" id="tcount">${wlTeams}</div>
+            <button class="step-btn" id="tplus">+</button>
+          </div>
+          <div class="tcenter muted2 mb16" style="font-size:12px">${wlTeams === 1 ? 'Single shared score' : `${wlTeams} teams take turns each round`}</div>
+
+          ${scoreboard}
         </div>
+        <button class="btn btn-primary" id="start" style="background:${WL_ACCENT}">${wlTeams > 1 ? `Start round — Team ${wlRoundNo % wlTeams + 1}` : 'Start round'}</button>
+      </div>
+    </div>`);
+  on(node, '#back', 'click', mainMenu);
+  on(node, '#tminus', 'click', () => { if (wlTeams > 1) { wlSetTeams(wlTeams - 1); wavelengthSetupScreen(); } });
+  on(node, '#tplus', 'click', () => { if (wlTeams < 4) { wlSetTeams(wlTeams + 1); wavelengthSetupScreen(); } });
+  on(node, '#reset', 'click', () => { wlScores = Array(wlTeams).fill(0); wlRoundNo = 0; wavelengthSetupScreen(); });
+  on(node, '#start', 'click', wavelengthRound);
+  mount(node);
+}
+
+function wavelengthRound() {
+  const [leftEnd, rightEnd] = wavelengthPairs[randInt(wavelengthPairs.length)];
+  const target = 8 + randInt(85);   // target centre, 8..92
+  let guess = 50;
+  let phase = 'psychic';            // psychic -> guess -> reveal
+  const team = wlRoundNo % wlTeams; // whose turn this round
+  const teamTag = wlTeams > 1 ? `<div class="tcenter mb8"><span class="wl-team">Team ${team + 1}'s turn</span></div>` : '';
+
+  // Band geometry (percent of bar width) and points by distance from centre.
+  const bands = [
+    { half: 20, cls: 'b2' },
+    { half: 12, cls: 'b3' },
+    { half: 5, cls: 'b4' },
+  ];
+  const scoreFor = (d) => (d <= 5 ? 4 : d <= 12 ? 3 : d <= 20 ? 2 : 0);
+
+  function bandsHtml() {
+    return bands.map((b) => {
+      const left = Math.max(0, target - b.half);
+      const right = Math.min(100, target + b.half);
+      return `<div class="wl-band ${b.cls}" style="left:${left}%;width:${right - left}%"></div>`;
+    }).join('');
+  }
+
+  // Point labels (2 · 3 · 4 · 3 · 2) centred on each scoring tier.
+  function bandLabelsHtml() {
+    const pts = [
+      { at: target, n: 4 },
+      { at: target - 8.5, n: 3 }, { at: target + 8.5, n: 3 },
+      { at: target - 16, n: 2 }, { at: target + 16, n: 2 },
+    ];
+    return pts
+      .filter((p) => p.at >= 2 && p.at <= 98)
+      .map((p) => `<div class="wl-point" style="left:${p.at}%">${p.n}</div>`)
+      .join('');
+  }
+
+  function render() {
+    let body;
+    if (phase === 'psychic') {
+      body = `
+        ${teamTag}
+        <div class="tcenter mb8" style="font-weight:700;letter-spacing:1px;color:var(--muted)">PSYCHIC ONLY</div>
+        <div class="muted tcenter mb16" style="font-size:13px">Memorise the target zone, give a one-word clue, then hide it.</div>
+        ${spectrumHtml(true, false)}
+        <div class="spacer"></div>
+        <button class="btn btn-primary" id="hide" style="background:${WL_ACCENT}">Hide target & give clue</button>`;
+    } else if (phase === 'guess') {
+      body = `
+        ${teamTag}
+        <div class="tcenter mb8" style="font-weight:700;letter-spacing:1px;color:var(--muted)">EVERYONE ELSE</div>
+        <div class="muted tcenter mb16" style="font-size:13px">Slide the dial to the Psychic's clue, then lock it in.</div>
+        ${spectrumHtml(false, true)}
+        <input type="range" class="wl-range" id="range" min="0" max="100" value="${guess}" />
+        <div class="spacer"></div>
+        <button class="btn btn-primary" id="lock" style="background:${WL_ACCENT}">Lock in guess</button>`;
+    } else {
+      const d = Math.abs(target - guess);
+      const pts = scoreFor(d);
+      const headline = wlTeams > 1
+        ? (pts > 0 ? `Team ${team + 1}: +${pts}` : `Team ${team + 1}: missed`)
+        : (pts > 0 ? `+${pts} points` : 'Missed it');
+      const tally = wlTeams > 1 ? `Team ${team + 1} total: ${wlScores[team]}` : `total ${wlScores[0]}`;
+      body = `
+        <div class="tcenter mb8" style="font-weight:700;letter-spacing:1px;color:var(--muted)">RESULT</div>
+        <div class="tcenter mb16" style="font-size:22px;font-weight:800">${headline}</div>
+        ${spectrumHtml(true, true)}
+        <div class="tcenter muted mt12" style="font-size:13px">You were ${d} away · ${tally}</div>
+        <div class="spacer"></div>
+        <button class="btn btn-primary mb8" id="next" style="background:${WL_ACCENT}">${wlTeams > 1 ? `Next round — Team ${wlRoundNo % wlTeams + 1}` : 'Next round'}</button>
+        <button class="btn btn-faint" id="menu">Main menu</button>`;
+    }
+
+    const node = el(`
+      <div class="screen">
+        <div class="wrap">
+          <div class="app-header">
+            <button class="icon-btn" id="back">${icon('back')}</button>
+            <div class="grow"><h1>Wavelength</h1></div>
+          </div>
+          ${body}
+        </div>
+      </div>`);
+
+    on(node, '#back', 'click', wavelengthSetupScreen);
+    if (phase === 'psychic') on(node, '#hide', 'click', () => { phase = 'guess'; render(); });
+    if (phase === 'guess') {
+      const range = node.querySelector('#range');
+      const marker = node.querySelector('#wl-marker');
+      range.addEventListener('input', () => { guess = +range.value; marker.style.left = `${guess}%`; });
+      on(node, '#lock', 'click', () => {
+        phase = 'reveal';
+        wlScores[team] += scoreFor(Math.abs(target - guess));
+        wlRoundNo++;
+        render();
+      });
+    }
+    if (phase === 'reveal') {
+      on(node, '#next', 'click', wavelengthRound);
+      on(node, '#menu', 'click', mainMenu);
+    }
+    mount(node);
+  }
+
+  /** Spectrum bar with optional target bands and/or the guess marker. */
+  function spectrumHtml(showBands, showMarker) {
+    return `
+      <div class="wl-ends"><span>${esc(leftEnd)}</span><span>${esc(rightEnd)}</span></div>
+      <div class="wl-bar">
+        ${showBands ? bandsHtml() + bandLabelsHtml() : ''}
+        ${showMarker ? `<div class="wl-marker" id="wl-marker" style="left:${guess}%"></div>` : ''}
+      </div>`;
+  }
+
+  render();
+}
+
+// ============================================================
+//  CUSTOM LISTS
+// ============================================================
+function listsScreen() {
+  const lists = getCustomLists();
+  const node = el(`
+    <div class="screen">
+      <div class="wrap">
+        <div class="app-header">
+          <button class="icon-btn" id="back">${icon('back')}</button>
+          <div class="grow"><h1>Custom Lists</h1><p>Make your own word lists</p></div>
+        </div>
+        <button class="btn btn-primary mb16" id="create">${icon('plus', 16)} New list</button>
         <div class="scroll" style="flex:1" id="list">
           ${lists.length === 0 ? `
             <div class="panel tcenter muted" style="padding:28px">
-              No custom lists yet. Create one, or import a list a friend shared with you.
+              No custom lists yet. Tap "New list" to make one — it'll show up as a category in every game.
             </div>` :
             lists.map((l) => listCardHtml(l)).join('')}
-          <div class="panel mt16 muted2" style="font-size:12px;line-height:1.5">
-            Lists and votes are saved on this device only. Use Share to send a list to friends via a
-            link or code. A real online community with global votes is on the roadmap (see PLANS.md).
-          </div>
         </div>
       </div>
     </div>`);
 
   on(node, '#back', 'click', mainMenu);
   on(node, '#create', 'click', () => listEditor(null));
-  on(node, '#import', 'click', importModal);
-  on(node, '.vote-up', 'click', (e) => { voteList(e.currentTarget.dataset.id, 1); listsScreen(); });
-  on(node, '.vote-down', 'click', (e) => { voteList(e.currentTarget.dataset.id, -1); listsScreen(); });
   on(node, '.list-preview', 'click', (e) => wordPreviewModal(resolveCat(e.currentTarget.dataset.id)));
   on(node, '.list-edit', 'click', (e) => listEditor(getCustomListById(e.currentTarget.dataset.id)));
-  on(node, '.list-share', 'click', (e) => shareModal(getCustomListById(e.currentTarget.dataset.id)));
   on(node, '.list-delete', 'click', (e) => confirmDelete(getCustomListById(e.currentTarget.dataset.id)));
   mount(node);
 }
@@ -1059,21 +1170,14 @@ function listsScreen() {
 function getCustomListById(id) { return getCustomLists().find((l) => l.id === id); }
 
 function listCardHtml(l) {
-  const vote = l.myVote || 0;
   return `
     <div class="list-card">
-      <div class="votes">
-        <button class="vote-up ${vote === 1 ? 'on' : ''}" data-id="${l.id}">${icon('up', 18)}</button>
-        <div class="score">${l.votes || 0}</div>
-        <button class="vote-down ${vote === -1 ? 'on' : ''}" data-id="${l.id}">${icon('down', 18)}</button>
-      </div>
       ${badge(catSymbol(l.name), l.primary, true)}
       <div class="grow" style="min-width:0">
         <b style="font-size:15px">${esc(l.name)}</b>
-        <div class="muted2" style="font-size:12px;margin-top:1px">${l.words.length} words${l.shared ? ' · shared with you' : ''}</div>
+        <div class="muted2" style="font-size:12px;margin-top:1px">${l.words.length} words</div>
       </div>
       <button class="icon-btn list-preview" data-id="${l.id}" title="Preview words">${icon('preview', 16)}</button>
-      <button class="icon-btn list-share" data-id="${l.id}" title="Share">${icon('share', 16)}</button>
       <button class="icon-btn list-edit" data-id="${l.id}" title="Edit">${icon('edit', 16)}</button>
       <button class="icon-btn list-delete" data-id="${l.id}" title="Delete">${icon('trash', 16)}</button>
     </div>`;
@@ -1119,48 +1223,6 @@ function listEditor(existing) {
   mount(node);
 }
 
-function shareModal(list) {
-  const url = shareUrl(list);
-  const code = encodeList(list);
-  const backdrop = openModal(`
-    <div class="dialog">
-      <h3>Share "${esc(list.name)}"</h3>
-      <div class="muted mb12" style="font-size:13px">Send this link to friends. Opening it lets them import the list and vote on it.</div>
-      <textarea class="input" id="url" rows="3" readonly>${esc(url)}</textarea>
-      <button class="btn btn-ghost mt8 mb16" id="copyurl">Copy link</button>
-      <div class="muted2 mb8" style="font-size:12px">Or share just the code:</div>
-      <textarea class="input" id="code" rows="3" readonly>${esc(code)}</textarea>
-      <button class="btn btn-ghost mt8" id="copycode">Copy code</button>
-      <button class="btn btn-faint mt12" id="close">Done</button>
-    </div>`, { center: true });
-  backdrop.querySelector('#copyurl').onclick = async () => toast((await copyText(url)) ? 'Link copied' : 'Copy failed');
-  backdrop.querySelector('#copycode').onclick = async () => toast((await copyText(code)) ? 'Code copied' : 'Copy failed');
-  backdrop.querySelector('#close').onclick = () => closeModal(backdrop);
-}
-
-function importModal() {
-  const backdrop = openModal(`
-    <div class="dialog">
-      <h3>Import a list</h3>
-      <div class="muted mb12" style="font-size:13px">Paste a share link or code from a friend.</div>
-      <textarea class="input" id="code" rows="4" placeholder="Paste link or code…"></textarea>
-      <button class="btn btn-primary mt12" id="go">Import</button>
-      <button class="btn btn-faint mt8" id="cancel">Cancel</button>
-    </div>`, { center: true });
-  backdrop.querySelector('#cancel').onclick = () => closeModal(backdrop);
-  backdrop.querySelector('#go').onclick = () => {
-    let raw = backdrop.querySelector('#code').value.trim();
-    const m = raw.match(/#share=(.+)$/);
-    if (m) raw = m[1];
-    const decoded = decodeList(raw);
-    if (!decoded) { toast('That code looks invalid'); return; }
-    importList(decoded);
-    closeModal(backdrop);
-    toast(`Imported "${decoded.name}"`);
-    listsScreen();
-  };
-}
-
 function confirmDelete(list) {
   const backdrop = openModal(`
     <div class="dialog">
@@ -1174,26 +1236,6 @@ function confirmDelete(list) {
 }
 
 // ============================================================
-//  Boot — handle a #share= link, then show the menu
+//  Boot
 // ============================================================
-function handleShareLink() {
-  const m = location.hash.match(/#share=(.+)$/);
-  if (!m) return false;
-  const decoded = decodeList(m[1]);
-  history.replaceState(null, '', location.pathname + location.search);
-  if (!decoded) { toast('That shared link looks invalid'); return false; }
-  const backdrop = openModal(`
-    <div class="dialog">
-      <h3>Import shared list?</h3>
-      <div class="row gap8 mb12">${badge(catSymbol(decoded.name), decoded.primary || '#5d6d7e', true)}<b style="font-size:16px">${esc(decoded.name)}</b></div>
-      <div class="muted mb16">${decoded.words.length} words — add it to your custom lists?</div>
-      <button class="btn btn-primary mb8" id="add">Import list</button>
-      <button class="btn btn-faint" id="skip">Not now</button>
-    </div>`, { center: true });
-  backdrop.querySelector('#add').onclick = () => { importList(decoded); closeModal(backdrop); toast(`Imported "${decoded.name}"`); listsScreen(); };
-  backdrop.querySelector('#skip').onclick = () => closeModal(backdrop);
-  return true;
-}
-
 mainMenu();
-handleShareLink();

@@ -30,9 +30,34 @@ export function setRetire(on) { settings.retire = !!on; save(KEY.settings, setti
 // ---------- Categories: built-in + manual extras + custom ----------
 function withId(c, id) { return { ...c, id }; }
 
+// Curated, mainstream category set (order shown in the UI). `src` is the source
+// list name in the data; `name` is the (possibly shortened) display name.
+// Niche categories (Music-by-song, Anime, School Subjects, Instruments,
+// Landmarks, etc.) are intentionally left out to keep the list short.
+const CURATED = [
+  { src: 'Movies & TV', name: 'Movies & TV' },
+  { src: 'Video Games', name: 'Video Games' },
+  { src: 'Animals', name: 'Animals' },
+  { src: 'Food & Drinks', name: 'Food' },
+  { src: 'Sports', name: 'Sports' },
+  { src: 'Countries', name: 'Countries' },
+  { src: 'Brands', name: 'Brands' },
+  { src: 'Disney', name: 'Disney' },
+  { src: 'Superheroes', name: 'Superheroes' },
+  { src: 'Vehicles', name: 'Vehicles' },
+  { src: 'Objects', name: 'Objects' },
+  { src: 'Actions', name: 'Actions' },
+  { src: 'Colleges', name: 'Colleges' },
+  { src: 'Japanese Foods', name: 'Japanese Foods' },
+];
+
 /** All categories the games can use, each guaranteed an `id`. */
 export function getCategories() {
-  const builtin = [...headsUpCategories, ...extraCategories].map((c) => withId(c, 'b:' + c.name));
+  const byName = {};
+  for (const c of [...headsUpCategories, ...extraCategories]) byName[c.name] = c;
+  const builtin = CURATED
+    .map(({ src, name }) => (byName[src] ? withId({ ...byName[src], name }, 'b:' + name) : null))
+    .filter(Boolean);
   const custom = getCustomLists().map((c) => withId(c, c.id));
   return [...builtin, ...custom];
 }
@@ -77,8 +102,8 @@ export function refreshUsed(cat) {
   persistUsed(cat.id);
 }
 
-// ---------- Custom lists (create your own) ----------
-// Each: { id, name, emoji, primary, secondary, words, votes, myVote, shared }
+// ---------- Custom lists (create your own, stored on this device) ----------
+// Each: { id, name, emoji, primary, secondary, words }
 export function getCustomLists() { return load(KEY.custom, []); }
 
 const PALETTE = [
@@ -103,7 +128,6 @@ export function saveCustomList({ id, name, emoji, words, primary, secondary }) {
     id: 'c:' + Math.random().toString(36).slice(2, 10),
     name, emoji: emoji || '✨', words: clean,
     primary: primary || pal[0], secondary: secondary || pal[1],
-    votes: 0, myVote: 0, shared: false,
   };
   lists.push(list);
   save(KEY.custom, lists);
@@ -113,48 +137,4 @@ export function saveCustomList({ id, name, emoji, words, primary, secondary }) {
 export function deleteCustomList(id) {
   save(KEY.custom, getCustomLists().filter((l) => l.id !== id));
   delete usedRaw[id]; usedCache.delete(id); save(KEY.used, usedRaw);
-}
-
-// ---------- Voting (device-local) ----------
-export function voteList(id, dir) {
-  const lists = getCustomLists();
-  const l = lists.find((x) => x.id === id);
-  if (!l) return null;
-  const prev = l.myVote || 0;
-  const next = prev === dir ? 0 : dir;       // tapping the same arrow clears it
-  l.votes = (l.votes || 0) - prev + next;
-  l.myVote = next;
-  save(KEY.custom, lists);
-  return l;
-}
-
-// ---------- Sharing (encode/decode a list to a portable code) ----------
-export function encodeList(list) {
-  const payload = { n: list.name, e: list.emoji, p: list.primary, s: list.secondary, w: list.words };
-  const json = JSON.stringify(payload);
-  // UTF-8 safe base64.
-  return btoa(unescape(encodeURIComponent(json)));
-}
-
-export function decodeList(code) {
-  try {
-    const json = decodeURIComponent(escape(atob(code.trim())));
-    const p = JSON.parse(json);
-    if (!p || !p.n || !Array.isArray(p.w)) return null;
-    return { name: String(p.n), emoji: p.e || '✨', primary: p.p, secondary: p.s, words: p.w.map(String) };
-  } catch { return null; }
-}
-
-/** Import a decoded list as a new local custom list (marked shared). */
-export function importList(decoded) {
-  const list = saveCustomList(decoded);
-  const lists = getCustomLists();
-  const i = lists.findIndex((l) => l.id === list.id);
-  if (i >= 0) { lists[i].shared = true; save(KEY.custom, lists); }
-  return list;
-}
-
-export function shareUrl(list) {
-  const base = location.origin + location.pathname;
-  return base + '#share=' + encodeList(list);
 }
