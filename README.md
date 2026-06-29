@@ -2,7 +2,26 @@
 
 Free party games that run in any browser, on phones and laptops. No install, no signup.
 
-**Play:** https://vitgruib.github.io/party-web/
+**Play:** https://vitgruib.github.io/spider-party/
+
+## 🎯 Why Spider-Party
+Spider-Party is an attempt to make party games **genuinely accessible and free for everyone**.
+
+Most party games put up barriers: you have to buy a card deck, download an app, make an
+account, sit through ads, or pay to unlock the "full" set of cards. That's friction at exactly
+the moment you want it least — when friends are already together and ready to play.
+
+Spider-Party removes all of it:
+- **Free, forever** — no purchase, no paywalled packs, no ads.
+- **Nothing to install** — it runs in any browser. Share a link (or scan a code) and everyone's in.
+- **No accounts, no tracking** — open it and play; your settings and custom lists stay on your device.
+- **Works on the cheapest phone or any laptop** — lightweight, no app store, no big download.
+- **Open source** — anyone can read it, run it, fork it, or contribute word lists and ideas.
+
+The goal is simple: if you have a group of friends and any device with a browser, you should be
+able to start a party game in seconds, for free.
+
+
 
 ## 🎮 Games
 - 🎭 **Charades / Heads Up** — guess the word on your forehead. Tap the right half = correct, left half = pass (or →/← / Space). No tilt needed.
